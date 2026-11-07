@@ -1,0 +1,10 @@
+# Google 登录所需依赖（在课程原有 requirements.txt 之外）
+#
+#   pip install -r requirements-google.txt
+#
+# httpx 用来跟 Google 换 token，google-auth 用来验证 id_token 的签名，
+# python-dotenv 用来从 .env 读取 client id / secret。
+httpx>=0.27
+google-auth>=2.35
+python-dotenv>=0.21
+cryptography>=42

@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PropTrack — Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nav:    #0F3544;
+    --teal:   #1D9E75;
+    --blue:   #1D7ABF;
+    --purple: #6D5ACF;
+    --orange: #C06A1A;
+    --red:    #B03A2E;
+    --bg:     #07131A;
+    --bg2:    #0D2130;
+    --bg3:    #112B3C;
+    --line:   #1B4057;
+    --text:   #C8DDE6;
+    --muted:  #5A7E8E;
+    --white:  #EFF6FA;
+    --grid:   rgba(29,154,117,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 48px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-dot {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--teal), var(--blue));
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono'; font-size: 14px; font-weight: 600; color: white;
+  }
+  .logo-text { font-size: 18px; font-weight: 600; color: var(--white); letter-spacing: -0.3px; }
+  .logo-sub  { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono'; letter-spacing: 0.5px; margin-top: 1px; }
+  .badge {
+    font-family: 'JetBrains Mono'; font-size: 11px; color: var(--teal);
+    background: rgba(29,158,117,0.1); border: 1px solid rgba(29,158,117,0.25);
+    padding: 4px 12px; border-radius: 20px;
+  }
+
+  /* Section label */
+  .section-label {
+    font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  /* ── LAYER ROWS ─────────────────────────────────────────────────── */
+  .layer {
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .layer-label {
+    font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 1.5px;
+    color: var(--muted); text-transform: uppercase;
+    writing-mode: horizontal-tb;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .layer-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--line), transparent);
+  }
+
+  /* ── CARDS ─────────────────────────────────────────────────────── */
+  .row {
+    display: flex; gap: 10px; align-items: stretch;
+  }
+  .row.center { justify-content: center; }
+  .row.spaced { justify-content: space-between; }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    flex: 1;
+  }
+  .card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: var(--card-color, var(--teal));
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .card:hover {
+    border-color: var(--card-color, var(--teal));
+    background: var(--bg3);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .card:hover::before { opacity: 1; }
+  .card.active {
+    border-color: var(--card-color, var(--teal));
+    background: var(--bg3);
+    box-shadow: 0 0 0 1px var(--card-color, var(--teal)), 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .card.active::before { opacity: 1; height: 3px; }
+
+  .card-icon {
+    font-size: 18px; margin-bottom: 6px; display: block;
+  }
+  .card-name {
+    font-family: 'JetBrains Mono'; font-size: 11px; font-weight: 600;
+    color: var(--white); margin-bottom: 3px;
+  }
+  .card-desc {
+    font-size: 10.5px; color: var(--muted); line-height: 1.4;
+  }
+  .card-port {
+    position: absolute; top: 10px; right: 12px;
+    font-family: 'JetBrains Mono'; font-size: 9px;
+    color: var(--card-color, var(--teal));
+    background: rgba(255,255,255,0.04);
+    padding: 2px 6px; border-radius: 3px;
+  }
+
+  /* ── KAFKA BUS ──────────────────────────────────────────────────── */
+  .kafka-bus {
+    background: linear-gradient(135deg, #0A1F2C, #0F2A3A);
+    border: 1px solid rgba(29,122,191,0.4);
+    border-radius: 12px;
+    padding: 18px 24px;
+    position: relative;
+    overflow: hidden;
+    margin: 4px 0;
+  }
+  .kafka-bus::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg,
+      rgba(29,122,191,0.06) 0%,
+      rgba(109,90,207,0.06) 50%,
+      rgba(29,158,117,0.06) 100%);
+  }
+  .kafka-title {
+    font-family: 'JetBrains Mono'; font-size: 13px; font-weight: 600;
+    color: var(--blue); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .kafka-title span { font-size: 10px; color: var(--muted); font-weight: 400; }
+  .kafka-topics {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .topic-pill {
+    font-family: 'JetBrains Mono'; font-size: 9.5px;
+    padding: 3px 10px; border-radius: 20px;
+    border: 1px solid; cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .topic-pill:hover { opacity: 0.85; transform: scale(1.02); }
+  .topic-pill.deals  { color: #5DC4A8; border-color: rgba(93,196,168,0.3); background: rgba(93,196,168,0.07); }
+  .topic-pill.ai     { color: #9D84E8; border-color: rgba(157,132,232,0.3); background: rgba(157,132,232,0.07); }
+  .topic-pill.docs   { color: #7BBFDF; border-color: rgba(123,191,223,0.3); background: rgba(123,191,223,0.07); }
+  .topic-pill.list   { color: #F0A56A; border-color: rgba(240,165,106,0.3); background: rgba(240,165,106,0.07); }
+
+  /* ── ARROWS ─────────────────────────────────────────────────────── */
+  .arrows {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 6px 0; position: relative;
+  }
+  .arrow-group {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    flex: 1;
+  }
+  .arrow-label {
+    font-family: 'JetBrains Mono'; font-size: 8.5px;
+    color: var(--muted); letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+  .arrow-line {
+    width: 1px; height: 28px;
+    position: relative; display: flex; flex-direction: column; align-items: center;
+  }
+  .arrow-line.down::after {
+    content: '▼'; font-size: 7px;
+    color: var(--teal); position: absolute; bottom: -2px;
+  }
+  .arrow-line.up::before {
+    content: '▲'; font-size: 7px;
+    color: var(--blue); position: absolute; top: -2px;
+  }
+  .arrow-line.both::after  { content: '▼'; font-size: 7px; color: var(--teal); position: absolute; bottom: -2px; }
+  .arrow-line.both::before { content: '▲'; font-size: 7px; color: var(--blue); position: absolute; top: -2px; }
+  .arrow-line .line {
+    width: 1px; flex: 1;
+    background: linear-gradient(180deg, var(--blue), var(--teal));
+    opacity: 0.5;
+    margin: 8px 0;
+  }
+
+  /* ── EXTERNAL SERVICES ──────────────────────────────────────────── */
+  .ext-row {
+    display: flex; gap: 10px;
+  }
+  .ext-card {
+    flex: 1; background: rgba(7,19,26,0.8);
+    border: 1px dashed var(--line);
+    border-radius: 8px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ext-icon { font-size: 20px; }
+  .ext-name { font-family: 'JetBrains Mono'; font-size: 10px; font-weight: 600; color: var(--muted); }
+  .ext-desc { font-size: 10px; color: #3A5A68; margin-top: 2px; }
+
+  /* ── DETAIL PANEL ───────────────────────────────────────────────── */
+  .detail-panel {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 24px;
+    display: none;
+    animation: slideIn 0.2s ease;
+  }
+  .detail-panel.visible { display: block; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .panel-title {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .panel-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .panel-name {
+    font-family: 'JetBrains Mono'; font-size: 14px; font-weight: 600; color: var(--white);
+  }
+  .panel-close {
+    font-family: 'JetBrains Mono'; font-size: 11px; color: var(--muted);
+    cursor: pointer; padding: 4px 10px;
+    border: 1px solid var(--line); border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .panel-close:hover { color: var(--white); border-color: var(--muted); }
+  .panel-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  }
+  .panel-section-title {
+    font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 1.5px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .event-list { display: flex; flex-direction: column; gap: 5px; }
+  .event-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 11px; line-height: 1.5;
+  }
+  .event-arrow {
+    font-family: 'JetBrains Mono'; font-size: 10px; font-weight: 600;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .pub  { color: var(--teal); }
+  .sub  { color: var(--blue); }
+  .event-name {
+    font-family: 'JetBrains Mono'; font-size: 10px;
+    color: var(--white); background: rgba(255,255,255,0.05);
+    padding: 1px 6px; border-radius: 3px; flex-shrink: 0;
+  }
+  .event-desc { color: var(--muted); }
+
+  .endpoint-list { display: flex; flex-direction: column; gap: 4px; }
+  .endpoint {
+    font-family: 'JetBrains Mono'; font-size: 10px;
+    color: var(--text); display: flex; gap: 8px; align-items: flex-start;
+  }
+  .method {
+    font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .get    { background: rgba(29,122,191,0.2); color: #7BBFDF; }
+  .post   { background: rgba(29,158,117,0.2); color: #6ED4A6; }
+  .put    { background: rgba(192,106,26,0.2); color: #F0A56A; }
+  .delete { background: rgba(176,58,46,0.2);  color: #E8837A; }
+
+  .db-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 12px;
+    font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex; gap: 20px; margin-top: 16px;
+    padding-top: 16px; border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10.5px; color: var(--muted);
+  }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-dash {
+    width: 16px; height: 1px;
+    border-top: 1px dashed var(--muted);
+  }
+
+  /* Pulse animation for Kafka */
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  .kafka-bus .kafka-title::before {
+    content: '';
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--blue);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Flow animation for arrows */
+  @keyframes flowDown {
+    0%   { background-position: 0 0; }
+    100% { background-position: 0 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-dot">PT</div>
+      <div>
+        <div class="logo-text">PropTrack</div>
+        <div class="logo-sub">ARCHITECTURE — MICROSERVICES</div>
+      </div>
+    </div>
+    <div class="badge">v1.0 · Draft · 2026</div>
+  </div>
+
+  <!-- Layer 1: Client -->
+  <div class="layer">
+    <div class="layer-label">Client layer</div>
+    <div class="row">
+      <div class="card" style="--card-color:#4AAFDF; max-width:100%;" onclick="showDetail('frontend')">
+        <span class="card-port">:5173 dev / CDN prod</span>
+        <span class="card-icon">🌐</span>
+        <div class="card-name">React Frontend</div>
+        <div class="card-desc">React 18 + TypeScript · Tailwind CSS · React Query · Zustand · Mapbox GL · dnd-kit · Recharts</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrows: Client → Gateway -->
+  <div class="arrows">
+    <div class="arrow-group">
+      <div class="arrow-label">HTTPS · JWT Bearer</div>
+      <div class="arrow-line both"><div class="line"></div></div>
+    </div>
+  </div>
+
+  <!-- Layer 2: Gateway -->
+  <div class="layer">
+    <div class="layer-label">API Gateway</div>
+    <div class="row">
+      <div class="card" style="--card-color:#8B9EA8; max-width:100%;" onclick="showDetail('gateway')">
+        <span class="card-port">:8080</span>
+        <span class="card-icon">🔀</span>
+        <div class="card-name">nginx / YARP Reverse Proxy</div>
+        <div class="card-desc">Route /api/v1/&lt;service&gt; → correct container · SSL termination · Rate limiting · CORS</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrows: Gateway → Services -->
+  <div class="arrows" style="padding:8px 0;">
+    <div class="arrow-group"><div class="arrow-label">→ auth</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ listings</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ deals</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ documents</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ lenders</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">ai-service: no public port</div><div class="arrow-line"><div class="line" style="opacity:0.15;"></div></div></div>
+  </div>
+
+  <!-- Layer 3: Services -->
+  <div class="layer">
+    <div class="layer-label">Service layer (ASP.NET Core 8 · C# 12)</div>
+    <div class="row">
+      <div class="card" style="--card-color:#5DC4A8;" onclick="showDetail('auth')">
+        <span class="card-port">:8085</span>
+        <span class="card-icon">🔐</span>
+        <div class="card-name">auth-service</div>
+        <div class="card-desc">JWT issuance · RBAC · ASP.NET Identity</div>
+      </div>
+      <div class="card" style="--card-color:#F0A56A;" onclick="showDetail('listings')">
+        <span class="card-port">:8081</span>
+        <span class="card-icon">🏢</span>
+        <div class="card-name">listings-service</div>
+        <div class="card-desc">Properties · Map view · AI summaries</div>
+      </div>
+      <div class="card" style="--card-color:#4AAFDF;" onclick="showDetail('deals')">
+        <span class="card-port">:8082</span>
+        <span class="card-icon">📋</span>
+        <div class="card-name">deals-service</div>
+        <div class="card-desc">Pipeline · Stages · Tasks · Comments</div>
+      </div>
+      <div class="card" style="--card-color:#9D84E8;" onclick="showDetail('documents')">
+        <span class="card-port">:8083</span>
+        <span class="card-icon">📄</span>
+        <div class="card-name">documents-service</div>
+        <div class="card-desc">Upload · PDF extraction · Presigned URLs</div>
+      </div>
+      <div class="card" style="--card-color:#E87D7D;" onclick="showDetail('lenders')">
+        <span class="card-port">:8084</span>
+        <span class="card-icon">🏦</span>
+        <div class="card-name">lenders-service</div>
+        <div class="card-desc">Directory · Deal financing · Term sheets</div>
+      </div>
+      <div class="card" style="--card-color:#A8D88A;" onclick="showDetail('ai')">
+        <span class="card-port">no port</span>
+        <span class="card-icon">🤖</span>
+        <div class="card-name">ai-service</div>
+        <div class="card-desc">Kafka consumer only · Claude API · Scoring · Risk flags</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrows: Services → Kafka -->
+  <div class="arrows" style="padding:8px 0;">
+    <div class="arrow-group"><div class="arrow-label">publish</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">publish</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">publish</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">publish</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">publish</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">consume</div><div class="arrow-line up"><div class="line"></div></div></div>
+  </div>
+
+  <!-- Layer 4: Kafka -->
+  <div class="layer">
+    <div class="layer-label">Event bus</div>
+    <div class="kafka-bus" onclick="showDetail('kafka')">
+      <div class="kafka-title">Apache Kafka 3.7 — KRaft mode (no ZooKeeper) <span>Click a topic for details</span></div>
+      <div class="kafka-topics">
+        <span class="topic-pill deals" onclick="event.stopPropagation();showTopic('deal.created')">deal.created</span>
+        <span class="topic-pill deals" onclick="event.stopPropagation();showTopic('deal.stage_changed')">deal.stage_changed</span>
+        <span class="topic-pill deals" onclick="event.stopPropagation();showTopic('deal.updated')">deal.updated</span>
+        <span class="topic-pill deals" onclick="event.stopPropagation();showTopic('deal.task_completed')">deal.task_completed</span>
+        <span class="topic-pill deals" onclick="event.stopPropagation();showTopic('deal.document_uploaded')">deal.document_uploaded</span>
+        <span class="topic-pill deals" onclick="event.stopPropagation();showTopic('deal.outcome_recorded')">deal.outcome_recorded</span>
+        <span class="topic-pill list"  onclick="event.stopPropagation();showTopic('property.created')">property.created</span>
+        <span class="topic-pill list"  onclick="event.stopPropagation();showTopic('property.updated')">property.updated</span>
+        <span class="topic-pill list"  onclick="event.stopPropagation();showTopic('property.status_changed')">property.status_changed</span>
+        <span class="topic-pill docs"  onclick="event.stopPropagation();showTopic('document.processed')">document.processed</span>
+        <span class="topic-pill ai"    onclick="event.stopPropagation();showTopic('ai.deal_score_ready')">ai.deal_score_ready</span>
+        <span class="topic-pill ai"    onclick="event.stopPropagation();showTopic('ai.risk_flags_ready')">ai.risk_flags_ready</span>
+        <span class="topic-pill ai"    onclick="event.stopPropagation();showTopic('ai.comment_ready')">ai.comment_ready</span>
+        <span class="topic-pill ai"    onclick="event.stopPropagation();showTopic('ai.property_summary_ready')">ai.property_summary_ready</span>
+        <span class="topic-pill ai"    onclick="event.stopPropagation();showTopic('ai.document_summary_ready')">ai.document_summary_ready</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrows: Kafka → Databases -->
+  <div class="arrows" style="padding:8px 0;">
+    <div class="arrow-group"><div class="arrow-label">auth schema</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">listings schema</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">deals schema</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">documents schema</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">lenders schema</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">ai schema</div><div class="arrow-line down"><div class="line"></div></div></div>
+  </div>
+
+  <!-- Layer 5: Data -->
+  <div class="layer">
+    <div class="layer-label">Data layer</div>
+    <div class="row">
+      <div class="card" style="--card-color:#5DC4A8; cursor:default;">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">PostgreSQL 16</div>
+        <div class="card-desc">auth schema · users, refresh_tokens</div>
+      </div>
+      <div class="card" style="--card-color:#F0A56A; cursor:default;">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">PostgreSQL 16</div>
+        <div class="card-desc">listings schema · properties, addresses, media, features · pgvector</div>
+      </div>
+      <div class="card" style="--card-color:#4AAFDF; cursor:default;">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">PostgreSQL 16</div>
+        <div class="card-desc">deals schema · deals, stage_history, tasks, comments</div>
+      </div>
+      <div class="card" style="--card-color:#9D84E8; cursor:default;">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">PostgreSQL 16</div>
+        <div class="card-desc">documents schema · document_records, document_text</div>
+      </div>
+      <div class="card" style="--card-color:#E87D7D; cursor:default;">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">PostgreSQL 16</div>
+        <div class="card-desc">lenders schema · lenders, deal_lenders</div>
+      </div>
+      <div class="card" style="--card-color:#A8D88A; cursor:default;">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">PostgreSQL 16</div>
+        <div class="card-desc">ai schema · request_log, score_history, prompt_templates</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- External services -->
+  <div class="layer" style="margin-top:20px;">
+    <div class="layer-label">External services</div>
+    <div class="ext-row">
+      <div class="ext-card">
+        <div class="ext-icon">🧠</div>
+        <div>
+          <div class="ext-name">Anthropic Claude API</div>
+          <div class="ext-desc">claude-sonnet-4-6 · RAG · Deal scoring · Doc Q&A · NL search · Risk flags</div>
+        </div>
+      </div>
+      <div class="ext-card">
+        <div class="ext-icon">☁️</div>
+        <div>
+          <div class="ext-name">Azure Blob / AWS S3</div>
+          <div class="ext-desc">Property media · Deal documents · Presigned upload + download URLs</div>
+        </div>
+      </div>
+      <div class="ext-card">
+        <div class="ext-icon">⚡</div>
+        <div>
+          <div class="ext-name">Redis 7</div>
+          <div class="ext-desc">AI response cache · Rate limiting · Session data · 1hr TTL on Claude responses</div>
+        </div>
+      </div>
+      <div class="ext-card">
+        <div class="ext-icon">📈</div>
+        <div>
+          <div class="ext-name">FRED API (Federal Reserve)</div>
+          <div class="ext-desc">Real-time 10-yr Treasury + SOFR rates for lender recommendation context</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div> Service owns + publishes</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> Service consumes</div>
+    <div class="legend-item"><div class="legend-dash"></div> External dependency</div>
+    <div class="legend-item" style="font-family:'JetBrains Mono'; font-size:10px;">Click any service card for details</div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <div class="panel-dot" id="panelDot"></div>
+        <div class="panel-name" id="panelName"></div>
+      </div>
+      <div class="panel-close" onclick="closeDetail()">✕ close</div>
+    </div>
+    <div id="panelContent"></div>
+  </div>
+
+</div>
+
+<script>
+const DATA = {
+  frontend: {
+    name: 'React Frontend',
+    color: '#4AAFDF',
+    db: null,
+    publishes: [],
+    consumes: [],
+    endpoints: [],
+    notes: 'React 18 + TypeScript. Tailwind CSS for styling. React Query for server state management. Zustand for local UI state. Mapbox GL for property map view. dnd-kit for Kanban drag-and-drop. Recharts for pipeline analytics charts. Runs outside Docker in development for hot-reload via Vite. In production served as static assets via CloudFront + S3.'
+  },
+  gateway: {
+    name: 'nginx / YARP API Gateway',
+    color: '#8B9EA8',
+    db: null,
+    publishes: [],
+    consumes: [],
+    endpoints: [
+      ['—', '/api/v1/auth/*     → auth-service:8085'],
+      ['—', '/api/v1/listings/* → listings-service:8081'],
+      ['—', '/api/v1/deals/*    → deals-service:8082'],
+      ['—', '/api/v1/documents/* → documents-service:8083'],
+      ['—', '/api/v1/lenders/*  → lenders-service:8084'],
+    ],
+    notes: 'Single public entry point. Handles SSL termination, rate limiting (100 req/min per IP), CORS (only known frontend origin), and request logging. ai-service has no public port and is not routed through the gateway.'
+  },
+  auth: {
+    name: 'auth-service',
+    color: '#5DC4A8',
+    db: 'auth schema → users, refresh_tokens, audit_log',
+    publishes: [
+      ['user.registered', 'New user created (future: notifications)'],
+    ],
+    consumes: [],
+    endpoints: [
+      ['POST', '/auth/v1/login'],
+      ['POST', '/auth/v1/register  (Admin only)'],
+      ['POST', '/auth/v1/refresh'],
+      ['POST', '/auth/v1/logout'],
+      ['GET',  '/auth/v1/me'],
+      ['PUT',  '/auth/v1/me'],
+      ['GET',  '/auth/v1/users  (Admin / MD)'],
+      ['PUT',  '/auth/v1/users/{id}/role'],
+      ['GET',  '/auth/v1/.well-known/jwks'],
+    ],
+    notes: 'Sole JWT issuer. RS256 signed tokens, 15-min expiry. Refresh tokens are opaque, hashed (SHA-256) before storage, 7-day expiry. All other services validate tokens locally using the public key from /jwks — no per-request call to auth-service. Roles: Analyst | Associate | VP | Principal | MD | Admin.'
+  },
+  listings: {
+    name: 'listings-service',
+    color: '#F0A56A',
+    db: 'listings schema → properties, addresses, property_media, property_features',
+    publishes: [
+      ['property.created', 'New property saved — ai-service generates ai_summary'],
+      ['property.updated', 'Price or cap rate changed — ai-service may rescore linked deal'],
+      ['property.status_changed', 'listed → under_contract → acquired transitions'],
+    ],
+    consumes: [
+      ['deal.created', 'Update property status to under_contract'],
+      ['deal.outcome_recorded', 'Update property status to acquired or back to listed'],
+      ['ai.property_summary_ready', 'Write generated ai_summary to property record'],
+    ],
+    endpoints: [
+      ['GET',    '/listings/v1/properties  (filterable, paginated)'],
+      ['POST',   '/listings/v1/properties'],
+      ['GET',    '/listings/v1/properties/{id}'],
+      ['PUT',    '/listings/v1/properties/{id}'],
+      ['DELETE', '/listings/v1/properties/{id}  (soft delete)'],
+      ['GET',    '/listings/v1/properties/map  (GeoJSON)'],
+      ['POST',   '/listings/v1/properties/{id}/suggest-price'],
+      ['POST',   '/listings/v1/properties/{id}/media'],
+      ['POST',   '/listings/v1/properties/{id}/features'],
+    ],
+    notes: 'Owns all property data. pgvector embedding column (ai_embedding VECTOR(1536)) on properties table enables semantic similarity search used by price suggestion and NL search fallback. Full-text search via PostgreSQL tsvector on title + description.'
+  },
+  deals: {
+    name: 'deals-service',
+    color: '#4AAFDF',
+    db: 'deals schema → deals, deal_stage_history, deal_tasks, deal_comments, deal_documents (metadata)',
+    publishes: [
+      ['deal.created', 'New deal from listing — triggers initial AI scoring'],
+      ['deal.stage_changed', 'Stage advance or kill — triggers AI rescore, lender check, risk flags'],
+      ['deal.updated', 'Financial fields changed — triggers AI rescore if pricing changed'],
+      ['deal.task_completed', 'Task set to Done — triggers progress % update'],
+      ['deal.document_uploaded', 'Doc record created after upload — triggers PDF extraction'],
+      ['deal.comment_added', 'New comment posted'],
+      ['deal.outcome_recorded', 'Terminal state — acquired or dead'],
+    ],
+    consumes: [
+      ['ai.deal_score_ready', 'Write ai_score + ai_score_rationale to deal record'],
+      ['ai.risk_flags_ready', 'Write risk_flags JSONB array to deal record'],
+      ['ai.comment_ready', 'Insert AI-generated comment into deal_comments'],
+      ['ai.deal_progress_updated', 'Update workflow completion % on deal card'],
+    ],
+    endpoints: [
+      ['GET',  '/deals/v1/deals  (stage, owner, priority filters)'],
+      ['POST', '/deals/v1/deals  (from property_id)'],
+      ['GET',  '/deals/v1/deals/{id}'],
+      ['PUT',  '/deals/v1/deals/{id}'],
+      ['POST', '/deals/v1/deals/{id}/advance'],
+      ['POST', '/deals/v1/deals/{id}/kill  (requires reason)'],
+      ['GET',  '/deals/v1/deals/{id}/history'],
+      ['GET/POST', '/deals/v1/deals/{id}/tasks'],
+      ['GET/POST', '/deals/v1/deals/{id}/comments'],
+      ['GET',  '/deals/v1/pipeline/summary'],
+    ],
+    notes: 'Operational core of the system. Stage transitions are enforced server-side (not just UI). deal_stage_history is append-only — never updated or deleted. risk_flags stored as PostgreSQL JSONB. Template tasks auto-generated on stage advance via StageTaskTemplateService.'
+  },
+  documents: {
+    name: 'documents-service',
+    color: '#9D84E8',
+    db: 'documents schema → document_records, document_text',
+    publishes: [
+      ['document.processed', 'PDF text extracted — triggers ai-service summarization + deal rescore'],
+    ],
+    consumes: [
+      ['deal.document_uploaded', 'Queue PDF text extraction via Hangfire background job'],
+      ['deal.stage_changed', 'Check for missing required documents — log warning internally'],
+    ],
+    endpoints: [
+      ['POST', '/documents/v1/upload-url  (request presigned PUT URL)'],
+      ['POST', '/documents/v1/confirm  (confirm upload, create record)'],
+      ['GET',  '/documents/v1/{id}/download-url  (presigned GET, 15min expiry)'],
+      ['GET',  '/documents/v1/{id}/text  (extracted text for Q&A)'],
+      ['DELETE', '/documents/v1/{id}  (soft-delete + mark blob for deletion)'],
+    ],
+    notes: 'Upload flow: client requests presigned URL → uploads directly to Blob/S3 → confirms to API → Hangfire job extracts PDF text → publishes document.processed. Files never pass through the API server bytes-wise. PdfPig library for text extraction. document_text is separated from document_records to keep the main table lean.'
+  },
+  ai: {
+    name: 'ai-service',
+    color: '#A8D88A',
+    db: 'ai schema → ai_request_log, ai_score_history, prompt_templates',
+    publishes: [
+      ['ai.deal_score_ready', 'Score + rationale after deal scoring'],
+      ['ai.risk_flags_ready', 'Risk flag array after stage change'],
+      ['ai.comment_ready', 'AI-generated comment text'],
+      ['ai.property_summary_ready', 'Generated property ai_summary'],
+      ['ai.document_summary_ready', 'Document AI summary after PDF processing'],
+      ['ai.deal_progress_updated', 'Workflow completion % after task completed'],
+    ],
+    consumes: [
+      ['property.created', 'Generate ai_summary for new property'],
+      ['deal.created', 'Initial AI deal scoring'],
+      ['deal.updated', 'Rescore if offer_price or cap_rate changed'],
+      ['deal.stage_changed', 'Recalculate risk flags + post stage summary comment'],
+      ['document.processed', 'Generate doc summary + optionally update deal score'],
+      ['deal.task_completed', 'Update workflow completion %'],
+    ],
+    endpoints: [],
+    notes: 'Pure event-driven worker — no public HTTP port. Stateless: rebuilds all context from event payload + supplementary API reads on each invocation. Redis-backed rate limiter: max 60 Claude API calls/min. AI response cache: 1hr TTL on identical prompts. All API calls logged to ai_request_log with token counts and cost. Anthropic.SDK NuGet package for C# integration.'
+  },
+  lenders: {
+    name: 'lenders-service',
+    color: '#E87D7D',
+    db: 'lenders schema → lenders, deal_lenders',
+    publishes: [
+      ['lenders.no_lender_warning', 'Deal in Underwriting with no lender — triggers risk flag'],
+    ],
+    consumes: [
+      ['deal.stage_changed (→ Underwriting)', 'Check if deal has lenders attached'],
+      ['deal.outcome_recorded', 'Update deal_lender records to final status'],
+    ],
+    endpoints: [
+      ['GET',    '/lenders/v1/lenders'],
+      ['POST',   '/lenders/v1/lenders  (Admin only)'],
+      ['GET',    '/lenders/v1/lenders/{id}  (with deal history)'],
+      ['PUT',    '/lenders/v1/lenders/{id}'],
+      ['GET/POST', '/lenders/v1/deals/{deal_id}/lenders'],
+      ['PUT/DELETE', '/lenders/v1/deals/{deal_id}/lenders/{id}'],
+      ['POST',   '/lenders/v1/deals/{deal_id}/suggest  (AI recommendation)'],
+    ],
+    notes: 'Manages lender directory and deal financing relationships. deal_lenders.status is a PostgreSQL enum: Exploring | TermSheetReceived | Committed | Declined | Funded | Withdrawn. AI lender recommendation is deprioritized — see architecture doc section 6.7. FRED API call for current 10yr Treasury + SOFR rates added at query time for rate context.'
+  },
+  kafka: {
+    name: 'Apache Kafka 3.7 — Event Bus',
+    color: '#7BBFDF',
+    db: null,
+    publishes: [],
+    consumes: [],
+    endpoints: [],
+    notes: 'KRaft mode — no ZooKeeper required. Single broker in development; 3-broker cluster in production (Amazon MSK). 90-day retention for deal and property topics; 30-day for AI topics; 7-day for transient events. Manual offset commits on all consumers — events re-processed on failure. Dead-letter queue topics for events that fail after 3 retries with exponential backoff. Each service has its own consumer group ID for independent offset tracking.'
+  }
+};
+
+const TOPICS = {
+  'deal.created':            { publisher: 'deals-service', consumers: ['listings-service (status → under_contract)', 'ai-service (initial scoring)'], retention: '90 days' },
+  'deal.stage_changed':      { publisher: 'deals-service', consumers: ['ai-service (rescore + risk flags)', 'lenders-service (check lender attached)', 'documents-service (check missing docs)'], retention: '90 days' },
+  'deal.updated':            { publisher: 'deals-service', consumers: ['ai-service (rescore if price changed)'], retention: '30 days' },
+  'deal.task_completed':     { publisher: 'deals-service', consumers: ['ai-service (update progress %)'], retention: '30 days' },
+  'deal.document_uploaded':  { publisher: 'deals-service', consumers: ['documents-service (queue PDF extraction)'], retention: '30 days' },
+  'deal.outcome_recorded':   { publisher: 'deals-service', consumers: ['listings-service (update property status)', 'lenders-service (finalize deal_lender records)'], retention: '90 days' },
+  'property.created':        { publisher: 'listings-service', consumers: ['ai-service (generate ai_summary)'], retention: '90 days' },
+  'property.updated':        { publisher: 'listings-service', consumers: ['ai-service (check if linked deal needs rescore)'], retention: '30 days' },
+  'property.status_changed': { publisher: 'listings-service', consumers: ['deals-service (awareness only)'], retention: '90 days' },
+  'document.processed':      { publisher: 'documents-service', consumers: ['ai-service (summarize + rescore deal)'], retention: '30 days' },
+  'ai.deal_score_ready':     { publisher: 'ai-service', consumers: ['deals-service (write score to deal record)'], retention: '30 days' },
+  'ai.risk_flags_ready':     { publisher: 'ai-service', consumers: ['deals-service (write flags to deal record)'], retention: '30 days' },
+  'ai.comment_ready':        { publisher: 'ai-service', consumers: ['deals-service (insert AI comment)'], retention: '30 days' },
+  'ai.property_summary_ready': { publisher: 'ai-service', consumers: ['listings-service (write ai_summary to property)'], retention: '30 days' },
+  'ai.document_summary_ready': { publisher: 'ai-service', consumers: ['documents-service (write summary to document record)'], retention: '30 days' },
+};
+
+let activeCard = null;
+
+function showDetail(id) {
+  const d = DATA[id];
+  if (!d) return;
+
+  // Toggle
+  if (activeCard === id) { closeDetail(); return; }
+  activeCard = id;
+
+  // Highlight active card
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  const panel = document.getElementById('detailPanel');
+  document.getElementById('panelDot').style.background = d.color;
+  document.getElementById('panelName').textContent = d.name;
+
+  let html = '';
+
+  if (d.db) {
+    html += `<div class="db-badge">🗄️ ${d.db}</div>`;
+  }
+
+  const hasPub = d.publishes.length > 0;
+  const hasSub = d.consumes.length > 0;
+  const hasEp  = d.endpoints.length > 0;
+
+  if (hasPub || hasSub) {
+    html += `<div class="panel-grid" style="margin-bottom:16px;">`;
+    if (hasPub) {
+      html += `<div><div class="panel-section-title">▲ Publishes to Kafka</div><div class="event-list">`;
+      d.publishes.forEach(([name, desc]) => {
+        html += `<div class="event-item"><span class="event-arrow pub">↑</span><span class="event-name">${name}</span><span class="event-desc">${desc}</span></div>`;
+      });
+      html += `</div></div>`;
+    } else {
+      html += `<div></div>`;
+    }
+    if (hasSub) {
+      html += `<div><div class="panel-section-title">▼ Consumes from Kafka</div><div class="event-list">`;
+      d.consumes.forEach(([name, desc]) => {
+        html += `<div class="event-item"><span class="event-arrow sub">↓</span><span class="event-name">${name}</span><span class="event-desc">${desc}</span></div>`;
+      });
+      html += `</div></div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (hasEp) {
+    html += `<div style="margin-bottom:16px;"><div class="panel-section-title">API endpoints</div><div class="endpoint-list">`;
+    d.endpoints.forEach(([method, path]) => {
+      const cls = method === 'GET' ? 'get' : method === 'POST' ? 'post' : method === 'PUT' ? 'put' : method === 'DELETE' ? 'delete' : 'get';
+      html += `<div class="endpoint"><span class="method ${cls}">${method}</span><span>${path}</span></div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (d.notes) {
+    html += `<div style="padding:12px 14px; background:rgba(255,255,255,0.03); border-radius:6px; border:1px solid var(--line);">
+      <div class="panel-section-title" style="margin-bottom:6px;">Notes</div>
+      <div style="font-size:11px; color:var(--muted); line-height:1.6;">${d.notes}</div>
+    </div>`;
+  }
+
+  document.getElementById('panelContent').innerHTML = html;
+  panel.classList.add('visible');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showTopic(topic) {
+  const t = TOPICS[topic];
+  if (!t) return;
+
+  closeActiveCard();
+  const panel = document.getElementById('detailPanel');
+  document.getElementById('panelDot').style.background = '#7BBFDF';
+  document.getElementById('panelName').textContent = `topic: ${topic}`;
+
+  let html = `
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px;">
+      <div>
+        <div class="panel-section-title">Publisher</div>
+        <div style="font-family:'JetBrains Mono'; font-size:11px; color:var(--teal); background:rgba(29,158,117,0.08); padding:6px 10px; border-radius:5px;">${t.publisher}</div>
+      </div>
+      <div>
+        <div class="panel-section-title">Consumers</div>
+        <div class="event-list">`;
+  t.consumers.forEach(c => {
+    html += `<div style="font-family:'JetBrains Mono'; font-size:10px; color:var(--text); background:rgba(29,122,191,0.08); padding:4px 8px; border-radius:4px; margin-bottom:4px;">${c}</div>`;
+  });
+  html += `</div></div>
+      <div>
+        <div class="panel-section-title">Retention</div>
+        <div style="font-family:'JetBrains Mono'; font-size:11px; color:var(--muted); padding:6px 10px;">${t.retention}</div>
+      </div>
+    </div>`;
+
+  document.getElementById('panelContent').innerHTML = html;
+  panel.classList.add('visible');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeActiveCard() {
+  activeCard = null;
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+}
+
+function closeDetail() {
+  closeActiveCard();
+  document.getElementById('detailPanel').classList.remove('visible');
+}
+</script>
+</body>
+</html>

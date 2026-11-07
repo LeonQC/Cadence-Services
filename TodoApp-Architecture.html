@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TodoApp — Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --indigo: #5E6AD2;
+    --cyan:   #26B5CE;
+    --green:  #4CB782;
+    --yellow: #F2C94C;
+    --red:    #EB5757;
+    --purple: #BB87FC;
+    --orange: #F2994A;
+    --grey:   #95A2B3;
+
+    --bg:    #080A12;
+    --bg2:   #11131F;
+    --bg3:   #191C2B;
+    --line:  #262A3D;
+    --text:  #C7CBDE;
+    --muted: #6B7290;
+    --white: #EEF0F8;
+    --grid:  rgba(94,106,210,0.06);
+
+    --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    --sans: 'DM Sans', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    gap: 16px; flex-wrap: wrap;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-dot {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--indigo), var(--cyan));
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600; color: white;
+  }
+  .logo-text { font-size: 18px; font-weight: 600; color: var(--white); letter-spacing: -0.3px; }
+  .logo-sub  { font-size: 11px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.5px; margin-top: 1px; }
+  .badge {
+    font-family: var(--mono); font-size: 11px; color: var(--indigo);
+    background: rgba(94,106,210,0.1); border: 1px solid rgba(94,106,210,0.28);
+    padding: 4px 12px; border-radius: 20px; white-space: nowrap;
+  }
+
+  /* ── LAYER ROWS ─────────────────────────────────────────────────── */
+  .layer { margin-bottom: 12px; position: relative; }
+  .layer-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px;
+    color: var(--muted); text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .layer-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--line), transparent);
+  }
+
+  /* ── CARDS ─────────────────────────────────────────────────────── */
+  .row { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    flex: 1; min-width: 158px;
+    text-align: left; color: inherit; font: inherit;
+  }
+  .card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: var(--card-color, var(--indigo));
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .card:hover {
+    border-color: var(--card-color, var(--indigo));
+    background: var(--bg3);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .card:hover::before { opacity: 1; }
+  .card:focus-visible { outline: 2px solid var(--card-color, var(--indigo)); outline-offset: 2px; }
+  .card.active {
+    border-color: var(--card-color, var(--indigo));
+    background: var(--bg3);
+    box-shadow: 0 0 0 1px var(--card-color, var(--indigo)), 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .card.active::before { opacity: 1; height: 3px; }
+  .card.static-card { cursor: default; }
+  .card.static-card:hover { transform: none; border-color: var(--line); background: var(--bg2); box-shadow: none; }
+
+  .card-icon { font-size: 18px; margin-bottom: 6px; display: block; }
+  .card-name {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    color: var(--white); margin-bottom: 3px;
+  }
+  .card-desc { font-size: 10.5px; color: var(--muted); line-height: 1.4; }
+  .card-port {
+    position: absolute; top: 10px; right: 12px;
+    font-family: var(--mono); font-size: 9px;
+    color: var(--card-color, var(--indigo));
+    background: rgba(255,255,255,0.04);
+    padding: 2px 6px; border-radius: 3px;
+  }
+
+  /* ── REDIS BAND (the one optional moving part) ───────────────────── */
+  .bus {
+    background: linear-gradient(135deg, #10131F, #171A2B);
+    border: 1px solid rgba(94,106,210,0.4);
+    border-radius: 12px;
+    padding: 18px 24px;
+    position: relative;
+    overflow: hidden;
+    margin: 4px 0;
+  }
+  .bus::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg,
+      rgba(94,106,210,0.06) 0%,
+      rgba(187,135,252,0.06) 50%,
+      rgba(38,181,206,0.06) 100%);
+    pointer-events: none;
+  }
+  .bus-title {
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--indigo); margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .bus-title span { font-size: 10px; color: var(--muted); font-weight: 400; }
+  .bus-sub { font-size: 10.5px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; position: relative; }
+  .pill-group { margin-bottom: 10px; position: relative; }
+  .pill-group:last-child { margin-bottom: 0; }
+  .pill-group-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 6px;
+  }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill {
+    font-family: var(--mono); font-size: 9.5px;
+    padding: 3px 10px; border-radius: 20px;
+    border: 1px solid; cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    background: none; color: inherit;
+  }
+  .pill:hover { opacity: 0.85; transform: scale(1.02); }
+  .pill.key   { color: #8E97E8; border-color: rgba(94,106,210,0.35);  background: rgba(94,106,210,0.08); }
+  .pill.cache { color: #6ED4A6; border-color: rgba(76,183,130,0.32);  background: rgba(76,183,130,0.07); }
+  .pill.deny  { color: #C9A3FD; border-color: rgba(187,135,252,0.32); background: rgba(187,135,252,0.07); }
+  .pill.db    { color: #F3AE6B; border-color: rgba(242,153,74,0.32);  background: rgba(242,153,74,0.07); }
+
+  /* ── ARROWS ─────────────────────────────────────────────────────── */
+  .arrows {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 6px 0; position: relative;
+  }
+  .arrow-group {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    flex: 1; min-width: 0;
+  }
+  .arrow-label {
+    font-family: var(--mono); font-size: 8.5px;
+    color: var(--muted); letter-spacing: 0.3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  }
+  .arrow-line {
+    width: 1px; height: 28px;
+    position: relative; display: flex; flex-direction: column; align-items: center;
+  }
+  .arrow-line.down::after  { content: '▼'; font-size: 7px; color: var(--green); position: absolute; bottom: -2px; }
+  .arrow-line.up::before   { content: '▲'; font-size: 7px; color: var(--cyan);  position: absolute; top: -2px; }
+  .arrow-line.both::after  { content: '▼'; font-size: 7px; color: var(--green); position: absolute; bottom: -2px; }
+  .arrow-line.both::before { content: '▲'; font-size: 7px; color: var(--cyan);  position: absolute; top: -2px; }
+  .arrow-line .line {
+    width: 1px; flex: 1;
+    background: linear-gradient(180deg, var(--cyan), var(--green));
+    opacity: 0.5;
+    margin: 8px 0;
+  }
+
+  /* ── EXTERNAL SERVICES ──────────────────────────────────────────── */
+  .ext-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .ext-card {
+    flex: 1; min-width: 210px; background: rgba(8,10,18,0.8);
+    border: 1px dashed var(--line);
+    border-radius: 8px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ext-icon { font-size: 20px; flex-shrink: 0; }
+  .ext-name { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--muted); }
+  .ext-desc { font-size: 10px; color: #4A5068; margin-top: 2px; line-height: 1.4; }
+  .ext-card.absent { opacity: 0.65; }
+
+  /* ── DETAIL PANEL ───────────────────────────────────────────────── */
+  .detail-panel {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 24px;
+    display: none;
+    animation: slideIn 0.2s ease;
+  }
+  .detail-panel.visible { display: block; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--line); gap: 12px;
+  }
+  .panel-title { display: flex; align-items: center; gap: 10px; }
+  .panel-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .panel-name { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--white); }
+  .panel-file { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .panel-close {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    cursor: pointer; padding: 4px 10px;
+    border: 1px solid var(--line); border-radius: 4px;
+    background: none; transition: all 0.15s; white-space: nowrap;
+  }
+  .panel-close:hover { color: var(--white); border-color: var(--muted); }
+  .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 720px) { .panel-grid { grid-template-columns: 1fr; } }
+  .panel-section-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .event-list { display: flex; flex-direction: column; gap: 5px; }
+  .event-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 11px; line-height: 1.5; flex-wrap: wrap;
+  }
+  .event-arrow { font-family: var(--mono); font-size: 10px; font-weight: 600; flex-shrink: 0; margin-top: 1px; }
+  .pub { color: var(--green); }
+  .sub { color: var(--cyan); }
+  .event-name {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--white); background: rgba(255,255,255,0.05);
+    padding: 1px 6px; border-radius: 3px; flex-shrink: 0;
+  }
+  .event-desc { color: var(--muted); }
+
+  .endpoint-list { display: flex; flex-direction: column; gap: 4px; }
+  .endpoint {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text); display: flex; gap: 8px; align-items: flex-start;
+  }
+  .method {
+    font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+    flex-shrink: 0; margin-top: 1px; min-width: 34px; text-align: center;
+  }
+  .get  { background: rgba(38,181,206,0.2);  color: #7BD5E4; }
+  .post { background: rgba(76,183,130,0.2);  color: #6ED4A6; }
+  .redirect { background: rgba(149,162,179,0.16); color: #A8B3C2; }
+
+  .db-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 12px;
+    font-family: var(--mono); font-size: 10px; color: var(--text);
+    margin-bottom: 12px; line-height: 1.5;
+  }
+
+  .why {
+    padding: 12px 14px; background: rgba(255,255,255,0.03);
+    border-radius: 6px; border: 1px solid var(--line);
+  }
+  .why-body { font-size: 11px; color: var(--muted); line-height: 1.65; }
+  .why-body code {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text); background: rgba(255,255,255,0.05);
+    padding: 1px 5px; border-radius: 3px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex; gap: 20px; margin-top: 16px;
+    padding-top: 16px; border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-dash { width: 16px; height: 1px; border-top: 1px dashed var(--muted); }
+
+  .footnote {
+    margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 10.5px; color: var(--muted); line-height: 1.7;
+  }
+  .footnote code {
+    font-family: var(--mono); font-size: 10px; color: var(--text);
+    background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 3px;
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+  .bus-title::before {
+    content: '';
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--indigo);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-dot">TD</div>
+      <div>
+        <div class="logo-text">TodoApp</div>
+        <div class="logo-sub">ARCHITECTURE — SERVER-RENDERED MONOLITH</div>
+      </div>
+    </div>
+    <div class="badge">TODO-9 · branch todo-9-cycles · 2026</div>
+  </div>
+
+  <!-- Layer 1: Browser -->
+  <div class="layer">
+    <div class="layer-label">Client layer</div>
+    <div class="row">
+      <div class="card" role="button" tabindex="0" style="--card-color:#26B5CE;" onclick="showDetail('browser', this)">
+        <span class="card-port">/static</span>
+        <span class="card-icon">🌐</span>
+        <div class="card-name">Browser — server-rendered HTML</div>
+        <div class="card-desc">36 Jinja2 templates · linear.css (1,341 lines) · app.js (225 lines, no framework) · forms post, server redirects · 3 cookies carry all client state</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrows">
+    <div class="arrow-group">
+      <div class="arrow-label">HTTP · form POST → 302/303 · cookie access_token, or Authorization: Bearer</div>
+      <div class="arrow-line both"><div class="line"></div></div>
+    </div>
+  </div>
+
+  <!-- Layer 2: ASGI entry -->
+  <div class="layer">
+    <div class="layer-label">Application entry</div>
+    <div class="row">
+      <div class="card" role="button" tabindex="0" style="--card-color:#95A2B3;" onclick="showDetail('app', this)">
+        <span class="card-port">:8000</span>
+        <span class="card-icon">🚪</span>
+        <div class="card-name">FastAPI app — main.py</div>
+        <div class="card-desc">uvicorn · lifespan pings Redis · mounts /static · includes 6 routers · 3 exception handlers turn raised guards into a redirect (browser) or JSON (API key)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrows">
+    <div class="arrow-group">
+      <div class="arrow-label">Depends(...) — resolved before any route body runs</div>
+      <div class="arrow-line down"><div class="line"></div></div>
+    </div>
+  </div>
+
+  <!-- Layer 3: Guards -->
+  <div class="layer">
+    <div class="layer-label">Guard layer — the one place access is decided</div>
+    <div class="row">
+      <div class="card" role="button" tabindex="0" style="--card-color:#EB5757;" onclick="showDetail('deps', this)">
+        <span class="card-port">deps.py</span>
+        <span class="card-icon">🛡️</span>
+        <div class="card-name">Request guards</div>
+        <div class="card-desc">identity → require_user → load_context → require_workspace → require_admin / require_owner · resolves the workspace through membership, never from the cookie alone</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#4CB782;" onclick="showDetail('authn', this)">
+        <span class="card-port">auth.py</span>
+        <span class="card-icon">🔑</span>
+        <div class="card-name">Credential resolution</div>
+        <div class="card-desc">Bearer API key wins over the cookie · JWT HS256, 60 min, claims sub/id/jti/tv/amr · SHA-256 key lookup · one indexed read either way</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrows" style="padding:8px 0;">
+    <div class="arrow-group"><div class="arrow-label">→ auth</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ issues</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ projects</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ cycles</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ workspaces</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">→ settings</div><div class="arrow-line down"><div class="line"></div></div></div>
+  </div>
+
+  <!-- Layer 4: Routers -->
+  <div class="layer">
+    <div class="layer-label">Router layer (FastAPI · Python 3.12)</div>
+    <div class="row">
+      <div class="card" role="button" tabindex="0" style="--card-color:#4CB782;" onclick="showDetail('r_auth', this)">
+        <span class="card-port">/auth/*</span>
+        <span class="card-icon">🔐</span>
+        <div class="card-name">auth</div>
+        <div class="card-desc">Login · register · Google OAuth · logout</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#5E6AD2;" onclick="showDetail('r_issues', this)">
+        <span class="card-port">/issue/·</span>
+        <span class="card-icon">📋</span>
+        <div class="card-name">issues</div>
+        <div class="card-desc">List · detail · status · priority · My Issues</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#F2994A;" onclick="showDetail('r_projects', this)">
+        <span class="card-port">/project/·</span>
+        <span class="card-icon">🎯</span>
+        <div class="card-name">projects</div>
+        <div class="card-desc">Features · lead · target date · progress</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#BB87FC;" onclick="showDetail('r_cycles', this)">
+        <span class="card-port">/cycles</span>
+        <span class="card-icon">🔄</span>
+        <div class="card-name">cycles</div>
+        <div class="card-desc">Time boxes · burn-up · scheduling</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#26B5CE;" onclick="showDetail('r_workspaces', this)">
+        <span class="card-port">/invite/·</span>
+        <span class="card-icon">🏢</span>
+        <div class="card-name">workspaces</div>
+        <div class="card-desc">Create · switch · invite links</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#F2C94C;" onclick="showDetail('r_settings', this)">
+        <span class="card-port">/settings/*</span>
+        <span class="card-icon">⚙️</span>
+        <div class="card-name">settings</div>
+        <div class="card-desc">Profile · keys · teams · members · policy</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrows" style="padding:8px 0;">
+    <div class="arrow-group"><div class="arrow-label">plain function calls — no network hop</div><div class="arrow-line both"><div class="line"></div></div></div>
+  </div>
+
+  <!-- Layer 5: Domain modules -->
+  <div class="layer">
+    <div class="layer-label">Domain layer — arithmetic and rules, no HTTP</div>
+    <div class="row">
+      <div class="card" role="button" tabindex="0" style="--card-color:#5E6AD2;" onclick="showDetail('m_models', this)">
+        <span class="card-port">368 ln</span>
+        <span class="card-icon">🧱</span>
+        <div class="card-name">models.py</div>
+        <div class="card-desc">10 ORM tables · STATUSES, ROLES · set_status() owns every derived column</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#4CB782;" onclick="showDetail('m_provisioning', this)">
+        <span class="card-port">209 ln</span>
+        <span class="card-icon">🌱</span>
+        <div class="card-name">provisioning.py</div>
+        <div class="card-desc">Workspace + team creation, slugs, keys, invites, deletion, issue numbering</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#F2994A;" onclick="showDetail('m_summary', this)">
+        <span class="card-port">290 ln</span>
+        <span class="card-icon">📊</span>
+        <div class="card-name">summary.py</div>
+        <div class="card-desc">Tiles, distributions, workload, 14-day trend — as SVG coordinates</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#BB87FC;" onclick="showDetail('m_cycle_math', this)">
+        <span class="card-port">251 ln</span>
+        <span class="card-icon">📐</span>
+        <div class="card-name">cycle_math.py</div>
+        <div class="card-desc">Cycles as a series, not a calendar · burn-up geometry</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#EB5757;" onclick="showDetail('m_redis', this)">
+        <span class="card-port">201 ln</span>
+        <span class="card-icon">⚡</span>
+        <div class="card-name">redis_cache.py</div>
+        <div class="card-desc">@degrades wrapper · circuit breaker · cache + deny-list</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#26B5CE;" onclick="showDetail('m_templating', this)">
+        <span class="card-port">68 ln</span>
+        <span class="card-icon">🖌️</span>
+        <div class="card-name">templating.py</div>
+        <div class="card-desc">One shared Jinja2 instance · globals every page reads</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrows" style="padding:8px 0;">
+    <div class="arrow-group"><div class="arrow-label">read-through cache</div><div class="arrow-line both"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">explicit invalidation on every write</div><div class="arrow-line down"><div class="line"></div></div></div>
+  </div>
+
+  <!-- Redis band -->
+  <div class="layer">
+    <div class="layer-label">Optional cache &amp; session state</div>
+    <div class="bus">
+      <div class="bus-title">Redis 7 — optional, fails soft <span>Click a key or a write path</span></div>
+      <div class="bus-sub">
+        Not a source of truth and not a broker. Every call is wrapped in <code>@degrades</code>: on failure it returns a miss,
+        opens a 10-second circuit and the request carries on straight off SQLite.
+      </div>
+
+      <div class="pill-group">
+        <div class="pill-group-label">Keys</div>
+        <div class="pills">
+          <button class="pill key" onclick="showTopic('issues:team:{team_id}')">issues:team:{team_id}</button>
+          <button class="pill key" onclick="showTopic('denylist:{jti}')">denylist:{jti}</button>
+        </div>
+      </div>
+
+      <div class="pill-group">
+        <div class="pill-group-label">Write paths that drop the issue cache</div>
+        <div class="pills">
+          <button class="pill cache" onclick="showTopic('POST /team/{key}/new')">POST /team/{key}/new</button>
+          <button class="pill cache" onclick="showTopic('POST /issue/{id}/edit')">POST /issue/{id}/edit</button>
+          <button class="pill cache" onclick="showTopic('POST /issue/{id}/status')">POST /issue/{id}/status</button>
+          <button class="pill cache" onclick="showTopic('POST /issue/{id}/priority')">POST /issue/{id}/priority</button>
+          <button class="pill cache" onclick="showTopic('POST /issue/{id}/project')">POST /issue/{id}/project</button>
+          <button class="pill cache" onclick="showTopic('POST /issue/{id}/cycle')">POST /issue/{id}/cycle</button>
+          <button class="pill cache" onclick="showTopic('POST /issue/{id}/delete')">POST /issue/{id}/delete</button>
+          <button class="pill cache" onclick="showTopic('POST /project/{id}/delete')">POST /project/{id}/delete</button>
+          <button class="pill cache" onclick="showTopic('POST /settings/teams/{key}/delete')">POST /settings/teams/{key}/delete</button>
+          <button class="pill cache" onclick="showTopic('POST /settings/workspace/delete')">POST /settings/workspace/delete</button>
+        </div>
+      </div>
+
+      <div class="pill-group">
+        <div class="pill-group-label">Session invalidation</div>
+        <div class="pills">
+          <button class="pill deny" onclick="showTopic('GET /auth/logout')">GET /auth/logout</button>
+          <button class="pill db" onclick="showTopic('POST /settings/security/sessions')">POST /settings/security/sessions</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrows" style="padding:8px 0;">
+    <div class="arrow-group"><div class="arrow-label">identity</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">tenancy</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">structure</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">planning</div><div class="arrow-line down"><div class="line"></div></div></div>
+    <div class="arrow-group"><div class="arrow-label">work</div><div class="arrow-line down"><div class="line"></div></div></div>
+  </div>
+
+  <!-- Data layer -->
+  <div class="layer">
+    <div class="layer-label">Data layer — one SQLite file, <code>todos.db</code></div>
+    <div class="row">
+      <div class="card" role="button" tabindex="0" style="--card-color:#4CB782;" onclick="showDetail('t_identity', this)">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">Identity</div>
+        <div class="card-desc">users · api_keys</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#26B5CE;" onclick="showDetail('t_tenancy', this)">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">Tenancy</div>
+        <div class="card-desc">workspaces · workspace_members · invites</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#F2C94C;" onclick="showDetail('t_structure', this)">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">Structure</div>
+        <div class="card-desc">teams · team_members</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#BB87FC;" onclick="showDetail('t_planning', this)">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">Planning</div>
+        <div class="card-desc">projects · cycles</div>
+      </div>
+      <div class="card" role="button" tabindex="0" style="--card-color:#5E6AD2;" onclick="showDetail('t_work', this)">
+        <span class="card-icon">🗄️</span>
+        <div class="card-name">Work</div>
+        <div class="card-desc">todos — the issues themselves</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- External services -->
+  <div class="layer" style="margin-top:20px;">
+    <div class="layer-label">External services</div>
+    <div class="ext-row">
+      <div class="ext-card">
+        <div class="ext-icon">🔵</div>
+        <div>
+          <div class="ext-name">Google OAuth 2.0</div>
+          <div class="ext-desc">accounts.google.com + oauth2.googleapis.com · authorization code flow · id_token verified against Google's public keys · unset credentials simply hide the button</div>
+        </div>
+      </div>
+      <div class="ext-card">
+        <div class="ext-icon">⚡</div>
+        <div>
+          <div class="ext-name">Redis 7</div>
+          <div class="ext-desc">Issue cache (60 s TTL) + logged-out token deny-list · entirely optional · 10 s circuit breaker on failure</div>
+        </div>
+      </div>
+      <div class="ext-card absent">
+        <div class="ext-icon">🚫</div>
+        <div>
+          <div class="ext-name">Deliberately absent</div>
+          <div class="ext-desc">No mail server (invites are copied links) · no object storage (no attachments) · no CDN (CSS and JS come from /static) · no LLM API · no message broker</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Writes / invalidates</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div> Reads</div>
+    <div class="legend-item"><div class="legend-dash"></div> External dependency</div>
+    <div class="legend-item" style="font-family:var(--mono); font-size:10px;">Click any card or pill · Esc closes</div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel" id="detailPanel" role="region" aria-live="polite">
+    <div class="panel-header">
+      <div class="panel-title">
+        <div class="panel-dot" id="panelDot"></div>
+        <div>
+          <div class="panel-name" id="panelName"></div>
+          <div class="panel-file" id="panelFile"></div>
+        </div>
+      </div>
+      <button class="panel-close" onclick="closeDetail()">✕ close</button>
+    </div>
+    <div id="panelContent"></div>
+  </div>
+
+  <div class="footnote">
+    <strong style="color:var(--text)">Why this shape.</strong>
+    Everything here runs in one process against one file. There is no service boundary to cross, so a "call" is a
+    Python function call and a transaction spans whatever it needs to. What would be a network contract in a
+    distributed system is a module boundary here: <code>deps.py</code> decides access, <code>models.py</code> owns derived
+    state, <code>summary.py</code> and <code>cycle_math.py</code> own arithmetic, and the routers own nothing but routing.
+    The only moving part that can fail independently is Redis, and it is built to be absent.
+    <br><br>
+    Companion documents: <code>api.md</code> (all 62 routes) · <code>database-schema.md</code> (all 10 tables).
+  </div>
+
+</div>
+
+<script>
+const DATA = {
+  browser: {
+    name: 'Browser — server-rendered HTML',
+    file: 'templates/ · static/todo/',
+    color: '#26B5CE',
+    db: null,
+    writes: [],
+    reads: [],
+    endpoints: [],
+    notes: 'No React, no bundler, no CDN, no build step. 36 Jinja2 templates render on the server; app.js (225 lines, plain ES5-compatible JS) handles menus, keyboard shortcuts and collapsible groups — replacing jQuery, Popper and Bootstrap\'s JS, which between them were ~90KB to do rather less. URLs are read from data attributes on &lt;body&gt; rather than written in JS, so templates stay the single place routes are spelled out. Charts are inline SVG whose coordinates were computed in Python. Three cookies carry all client state: access_token (httponly JWT), active_workspace (which workspace is being viewed) and oauth_state (signed, 300s, only during a Google round trip).'
+  },
+  app: {
+    name: 'FastAPI app',
+    file: 'main.py — 76 lines',
+    color: '#95A2B3',
+    db: null,
+    writes: [],
+    reads: [],
+    endpoints: [
+      ['—', 'app.mount("/static", StaticFiles(...))'],
+      ['—', 'include_router × 8  (workspaces contributes two)'],
+      ['—', 'lifespan: ping Redis on start, close on shutdown'],
+    ],
+    notes: 'The whole application is one ASGI app behind one uvicorn process. main.py does three things and nothing else: create the tables, wire the routers, and convert the guard exceptions raised in deps.py into responses. That conversion is the only place it branches on the caller: a browser gets a redirect, an Authorization: Bearer caller gets JSON. NotAuthenticated → 302 /auth/ or 401. NoWorkspace → 302 /workspaces/new or 409. Forbidden → a 403 page or 403 JSON — deliberately not a redirect, since the user is already signed in and the login page would bounce them straight back.'
+  },
+  deps: {
+    name: 'Request guards',
+    file: 'deps.py — 282 lines',
+    color: '#EB5757',
+    db: 'reads users, workspace_members, workspaces, teams, team_members',
+    writes: [],
+    reads: [
+      ['identity', 'Decode the cookie or look up the API key — cached per request by FastAPI'],
+      ['require_user', 'The signed-in user as an ORM row; raises rather than returning None'],
+      ['load_context', 'Resolve the active workspace through membership, never from the cookie alone'],
+      ['require_workspace', 'Guarantees ctx.workspace is present'],
+      ['require_admin', 'role owner or admin'],
+      ['require_owner', 'role owner'],
+    ],
+    endpoints: [],
+    notes: 'Every route used to repeat the same four lines of get_current_user plus a redirect. With workspaces and roles in play that would have become a dozen copies of the same check, each one an opportunity to forget the membership half — so the checks live here once and a route declares what it needs in its signature. The failures are raised, not returned, so a route can never accidentally carry on past one. The active_workspace cookie is only a hint: the workspace is resolved through workspace_members, so pointing it at somebody else\'s workspace resolves to nothing rather than granting access. A workspace\'s sign-in policy is enforced here rather than at the login form, because which workspace\'s rules apply is only knowable once one is resolved — a user can belong to several with different rules.'
+  },
+  authn: {
+    name: 'Credential resolution',
+    file: 'routers/auth.py — 642 lines',
+    color: '#4CB782',
+    db: 'users.hashed_password, users.google_sub, users.token_version, api_keys.key_hash',
+    writes: [
+      ['access_token', 'HS256 JWT, 60 min — set on password login, Google callback and session reset'],
+      ['api_keys.last_used_at', 'Stamped on every Bearer call'],
+    ],
+    reads: [
+      ['Authorization: Bearer', 'SHA-256 of the key → one indexed lookup on api_keys.key_hash'],
+      ['cookie access_token', 'Signature, jti deny-list, is_active, and tv vs users.token_version'],
+    ],
+    endpoints: [],
+    notes: 'Four independent things must all agree before a token is accepted: the signature, the Redis deny-list (logout), users.is_active, and the token_version the token was minted with. The three layers of revocation each cover what the others cannot — the cookie delete stops the browser sending it, the deny-list stops the token this session, and token_version stops every token everywhere including sessions on other machines and while Redis is down. API keys are lin_api_ plus 32 bytes of secrets.token_urlsafe; only the SHA-256 and a display prefix are stored. No salt and no bcrypt on purpose: the key is machine-generated entropy, not a human-chosen password, so there is nothing for a rainbow table or a slow hash to defend against.'
+  },
+
+  r_auth: {
+    name: 'auth router',
+    file: 'routers/auth.py',
+    color: '#4CB782',
+    db: 'users',
+    writes: [
+      ['users', 'Registration, and Google account linking'],
+      ['denylist:{jti}', 'Logout, TTL = the token\'s remaining life'],
+      ['provisioning', 'Every signup path provisions a workspace + team'],
+    ],
+    reads: [
+      ['Google id_token', 'Verified against Google\'s public keys, issuer, audience and expiry'],
+      ['oauth_state cookie', 'Signed with SECRET_KEY, carries the mode (login vs link)'],
+    ],
+    endpoints: [
+      ['GET',  '/auth/            login page'],
+      ['POST', '/auth/            form login → 302 /'],
+      ['POST', '/auth/token       OAuth2 form → cookie'],
+      ['POST', '/auth/create/user JSON — the one JSON write'],
+      ['GET',  '/auth/register'],
+      ['POST', '/auth/register'],
+      ['GET',  '/auth/google      → accounts.google.com'],
+      ['GET',  '/auth/google/link link to signed-in account'],
+      ['GET',  '/auth/google/callback'],
+      ['GET',  '/auth/logout'],
+    ],
+    notes: 'Google login is the standard authorization code exchange; it replaces only the "who are you" step, and everything downstream is untouched. The OAuth state is kept in a signed cookie rather than server-side, so Google login works whether or not Redis is running, and samesite must stay lax — the callback arrives as a top-level navigation from Google, and strict would withhold the cookie on exactly that request. Identities are matched on Google\'s sub first because it never changes; falling back to email is what lets an existing password account pick up Google sign-in, but only when Google reports the address as verified. Login and link are separate modes carried inside the signed cookie, so the callback cannot be talked into treating one as the other.'
+  },
+  r_issues: {
+    name: 'issues router',
+    file: 'routers/issues.py — 383 lines',
+    color: '#5E6AD2',
+    db: 'todos, teams, team_members, users, projects, cycles',
+    writes: [
+      ['todos', 'Create, edit, status, priority, project, delete'],
+      ['teams.issue_counter', 'Incremented to reserve the next issue number'],
+      ['invalidate_issues(team_id)', 'After every write'],
+    ],
+    reads: [
+      ['issues:team:{id}', 'Read-through cache for the list and Home'],
+      ['summary.build()', 'Every figure and chart on the team Home page'],
+      ['cycle_math.ensure()', 'Open cycles for the picker on the detail page'],
+    ],
+    endpoints: [
+      ['GET',  '/                      → team home'],
+      ['GET',  '/team/{key}/issues'],
+      ['GET',  '/team/{key}/home       tiles, trend, workload'],
+      ['GET',  '/my-issues             across all teams'],
+      ['GET',  '/team/{key}/new'],
+      ['POST', '/team/{key}/new'],
+      ['GET',  '/issue/{identifier}'],
+      ['GET',  '/issue/{identifier}/edit'],
+      ['POST', '/issue/{identifier}/edit'],
+      ['POST', '/issue/{identifier}/status'],
+      ['POST', '/issue/{identifier}/priority'],
+      ['POST', '/issue/{identifier}/project'],
+      ['POST', '/issue/{identifier}/delete'],
+      ['→',    '/team/{key}/summary    308 → /home'],
+    ],
+    notes: 'URLs are built from what a thing is called rather than from its row id, so /issue/TODO-3 is the same string you would paste into a commit message. The id still exists, it just is not the address. Every lookup joins through teams → team_members, so an issue in another workspace is unreachable rather than forbidden. Status changes are POST, not GET: the list renders one control per row, and as links they would all be prefetchable — which is exactly what the old /todos/complete/{id} link got wrong. This module owns two pure helpers (group_by_status, users_by_id) that projects.py and cycles.py import; the dependency only goes that way, or the modules will not load.'
+  },
+  r_projects: {
+    name: 'projects router',
+    file: 'routers/projects.py — 215 lines',
+    color: '#F2994A',
+    db: 'projects, todos, teams, users',
+    writes: [
+      ['projects', 'Create, edit, status, delete'],
+      ['todos.project_id', 'Set to NULL when a project is deleted — issues are released, not deleted'],
+      ['invalidate_issues(team_id)', 'After a delete, because the released rows changed'],
+    ],
+    reads: [
+      ['summary.project_rows()', 'Shared with team Home, so "how done is this" is computed once'],
+    ],
+    endpoints: [
+      ['GET',  '/team/{key}/projects'],
+      ['GET',  '/team/{key}/projects/new'],
+      ['POST', '/team/{key}/projects/new'],
+      ['GET',  '/project/{id}'],
+      ['GET',  '/project/{id}/edit'],
+      ['POST', '/project/{id}/edit'],
+      ['POST', '/project/{id}/status'],
+      ['POST', '/project/{id}/delete'],
+    ],
+    notes: 'A project is a feature: one deliverable made of several issues, and the parent half of the issue hierarchy. Scoped to a team rather than to the workspace, so a project\'s issues share one identifier prefix and one cycle calendar. Deleting a project releases its issues rather than taking them with it — an issue is the unit people care about, and a feature being cancelled is not a reason to lose the work logged under it. An issue can only be attached to a project in its own team; anything else is refused rather than ignored, because a stale form would otherwise file work under a feature the team cannot see. Progress is a percentage of the project\'s own issues, not of the team\'s: two of two done is finished, however small the project.'
+  },
+  r_cycles: {
+    name: 'cycles router',
+    file: 'routers/cycles.py — 124 lines',
+    color: '#BB87FC',
+    db: 'cycles, todos, teams',
+    writes: [
+      ['cycles', 'Rows materialised lazily by cycle_math.ensure()'],
+      ['todos.cycle_id', 'Schedule or unschedule an issue'],
+      ['invalidate_issues(team_id)', 'After scheduling'],
+    ],
+    reads: [
+      ['cycle_math.states()', 'completed / current / upcoming / planned, from the calendar'],
+      ['cycle_math.burn_up()', 'Scope, Started and Completed per day'],
+    ],
+    endpoints: [
+      ['GET',  '/team/{key}/cycles           list + burn-up'],
+      ['GET',  '/team/{key}/cycles/current'],
+      ['GET',  '/team/{key}/cycles/upcoming'],
+      ['POST', '/issue/{identifier}/cycle'],
+    ],
+    notes: 'Cycles are an arithmetic series, not hand-made rows: cycle N runs from anchor + (N-1) × length for length days. Storing the rule rather than a calendar means Current and Upcoming are always populated with no cron job keeping a table topped up, and the numbering is gapless and the dates contiguous by construction. Rows still exist because an issue has to point at one, and they are filled in lazily up to three cycles past today. Which cycle is Current is read off the calendar every time and never stored — a stored flag would be wrong the morning after. Completed cycles are kept out of the picker: scheduling work into one that has already ended would make its burn-up disagree with what actually happened.'
+  },
+  r_workspaces: {
+    name: 'workspaces router',
+    file: 'routers/workspaces.py — 150 lines',
+    color: '#26B5CE',
+    db: 'workspaces, workspace_members, invites, teams',
+    writes: [
+      ['workspaces + teams', 'Always created together'],
+      ['workspace_members', 'On invite acceptance'],
+      ['invites.status', 'Marked accepted once used'],
+      ['active_workspace', 'Cookie repointed on create, switch and accept'],
+    ],
+    reads: [
+      ['invites', 'Resolved by token alone, so a link works without the recipient identifying themselves'],
+    ],
+    endpoints: [
+      ['GET',  '/workspaces/new'],
+      ['POST', '/workspaces/new'],
+      ['POST', '/workspaces/switch/{slug}'],
+      ['GET',  '/invite/{token}'],
+      ['POST', '/invite/{token}'],
+    ],
+    notes: 'These two pages run on load_context rather than require_workspace, because they are the only pages that have to work for someone with no workspace at all — bouncing an invitee to the create form would lose the invite. Switching is POST, not GET: it changes what every later request resolves to, and a GET would be followed by prefetchers and crawlers. Invites live at a short top-level URL rather than under /workspaces because the link is pasted into a chat or an email, so it should read like one. An accepted invite is marked used even when the recipient was already a member — leaving it pending would let it be forwarded to somebody else.'
+  },
+  r_settings: {
+    name: 'settings router',
+    file: 'routers/settings.py — 632 lines',
+    color: '#F2C94C',
+    db: 'users, api_keys, workspaces, workspace_members, teams, team_members, invites',
+    writes: [
+      ['users', 'Profile, password, avatar colour, token_version'],
+      ['api_keys', 'Create and revoke'],
+      ['workspaces', 'Name, slug, sign-in policy, deletion'],
+      ['teams / members', 'Create, rename, membership, roles, removal'],
+    ],
+    reads: [
+      ['ctx.is_admin', 'Chooses which navigation sections render'],
+      ['?notice= / ?error=', 'Short codes resolved to sentences from a table'],
+    ],
+    endpoints: [
+      ['GET',  '/settings/profile · /security · /accounts · /api'],
+      ['POST', '/settings/profile'],
+      ['POST', '/settings/security/password'],
+      ['POST', '/settings/security/sessions'],
+      ['POST', '/settings/accounts/google/disconnect'],
+      ['POST', '/settings/api/keys · /keys/{id}/revoke'],
+      ['GET',  '/settings/workspace · /workspace/security · /teams · /members'],
+      ['POST', '/settings/workspace · /workspace/delete'],
+      ['POST', '/settings/workspace/security'],
+      ['POST', '/settings/teams · /teams/{key} · /members · /delete'],
+      ['POST', '/settings/members/invite · /{id}/role · /{id}/remove'],
+    ],
+    notes: 'The navigation is data rather than markup, so what is routed and what is linked cannot drift apart — an entry with no href renders greyed out, and those are only ever features this rebuild does not cover. Every administration route sits behind require_admin: hiding a link in a template is presentation, and the dependency is the part that actually refuses someone who types the URL. Several writes are refused specifically because they would strip the actor of their own access: disabling the sign-in method you are currently using, removing the last owner, unlinking Google from an account with no password, deleting your only workspace. Outcomes travel between a POST and its redirect as short codes so the wording lives in one table and the address bar stays readable.'
+  },
+  m_models: {
+    name: 'models.py',
+    file: 'models.py — 368 lines',
+    color: '#5E6AD2',
+    db: '10 tables: users, workspaces, workspace_members, teams, team_members, invites, api_keys, projects, cycles, todos',
+    writes: [
+      ['set_status()', 'The single writer of complete, completed_at, started_at and updated_at'],
+    ],
+    reads: [
+      ['STATUSES / ROLES', 'The canonical enumerations; ROLES order is load-bearing'],
+      ['identifier', 'A property composed from teams.key + todos.number, never stored'],
+    ],
+    endpoints: [],
+    notes: 'The rule the whole schema leans on: status is the input, and complete, completed_at and started_at are derived from it and never set on their own, so they cannot drift apart. started_at is written once and then left alone — it records when work first began, which is what the cycle burn-up plots; if moving an issue back to Todo and forward again reset it, the chart would rewrite its own history every time someone corrected a mis-click. The Todos class is still called that because the table predates the rename and renaming it would mean rewriting every existing row\'s home. utcnow() strips tzinfo because SQLite hands datetimes back naive, and storing aware ones would turn every later comparison into a TypeError.'
+  },
+  m_provisioning: {
+    name: 'provisioning.py',
+    file: 'provisioning.py — 209 lines',
+    color: '#4CB782',
+    db: 'workspaces, workspace_members, teams, team_members, invites, todos',
+    writes: [
+      ['create_workspace()', 'A workspace and its first team, in one transaction'],
+      ['next_issue_number()', 'Reserves the next number by bumping teams.issue_counter'],
+      ['delete_team / delete_workspace', 'Returns the team ids whose cache the caller must drop'],
+    ],
+    reads: [
+      ['domain_allowed()', 'Whether an address may join a workspace'],
+    ],
+    endpoints: [],
+    notes: 'Three separate paths need a user to end up with somewhere to work — password signup, Google signup, and the create-workspace form — so the shape of a new workspace is defined once here instead of three times, and it matches what the migration backfilled onto existing accounts. create_team does not commit: the caller decides where the transaction ends, so a half-built workspace never reaches the database. The two delete functions return the ids to invalidate rather than clearing the cache themselves, which keeps them synchronous while making the obligation hard to miss — it matters because SQLite hands a new team the rowid a deleted one just freed, and the cache is keyed on that id.'
+  },
+  m_summary: {
+    name: 'summary.py',
+    file: 'summary.py — 290 lines',
+    color: '#F2994A',
+    db: 'reads todos, users, projects',
+    writes: [],
+    reads: [
+      ['stat_tiles()', 'Four headline numbers, two with a week-on-week delta'],
+      ['status_rows / priority_rows', 'Distribution bars scaled to the largest, not the total'],
+      ['workload_rows()', 'Open issues per assignee — finished work is not a load'],
+      ['trend_chart()', '14 days of created vs completed, as polyline coordinates'],
+      ['project_rows()', 'Shared with the projects router'],
+    ],
+    endpoints: [],
+    notes: 'Kept out of the router because it is arithmetic, not routing: the route hands this a team\'s issues and gets back everything the template draws, so the template does no maths and there is one place to check the figures. The coordinates are computed here too — the alternative, a charting library, would mean a build step and a CDN for one page, and this application has neither. Only two of the four tiles carry a delta: "In progress" and "Backlog" are states, not events, and a delta on a standing count would invite reading it as a rate. Bar widths are relative to the largest bar rather than the total, because scaling by total leaves every bar a stub as soon as one status dominates.'
+  },
+  m_cycle_math: {
+    name: 'cycle_math.py',
+    file: 'cycle_math.py — 251 lines',
+    color: '#BB87FC',
+    db: 'cycles (lazy insert), reads todos',
+    writes: [
+      ['ensure()', 'Materialises missing cycle rows — idempotent, capped at 200'],
+    ],
+    reads: [
+      ['states()', 'completed / current / upcoming / planned, from today\'s date'],
+      ['burn_up()', 'Scope, Started and Completed per day, stopping at today'],
+      ['chart()', 'Daily rows → SVG geometry in the same box as the Home trend'],
+    ],
+    endpoints: [],
+    notes: 'Named cycle_math rather than cycles so it cannot be confused with the router. Scope uses each issue\'s creation date as the day it entered the cycle — nothing records when an issue was assigned to one, so an issue moved in late shows as having been there from the start. That approximation is stated in the source rather than left for a reader to infer from a line that climbs earlier than they remember. The actual lines stop at today while the x axis still spans the whole cycle: drawing the remaining days would put flat lines where there is no data yet, which reads as "no progress" rather than "not yet".'
+  },
+  m_redis: {
+    name: 'redis_cache.py',
+    file: 'redis_cache.py — 201 lines',
+    color: '#EB5757',
+    db: null,
+    writes: [
+      ['set_cached_issues()', 'JSON snapshot of a team\'s issues, 60 s TTL'],
+      ['invalidate_issues()', 'Called by every write path'],
+      ['denylist_token()', 'jti with a TTL equal to the token\'s remaining life'],
+    ],
+    reads: [
+      ['get_cached_issues()', 'Returns None on a miss — or on an outage'],
+      ['is_denylisted()', 'False when Redis is down, i.e. fails open'],
+    ],
+    endpoints: [],
+    notes: 'Catching redis.RedisError alone was not enough: a connection that dies underneath the client surfaces as an OSError from the socket layer or a RuntimeError from asyncio, and neither subclasses RedisError, so both escaped and turned a page that merely wanted a cache lookup into a 500. @degrades catches everything except CancelledError. Failing soft was also not enough on its own — while Redis was down, every call still paid connect-and-retry before giving up, which took a 40 ms page to 2 s: degraded into unusable. A failure now opens a 10 s circuit. The deny-list fails open on purpose; failing closed would sign every user out whenever Redis blinks, and users.token_version covers the case this cannot because it lives in the database. The module must not be named redis.py, or it would shadow the package.'
+  },
+  m_templating: {
+    name: 'templating.py',
+    file: 'templating.py — 68 lines',
+    color: '#26B5CE',
+    db: null,
+    writes: [],
+    reads: [
+      ['templates.env.globals', 'STATUS_LABELS, avatar_color, initials, relative_time, …'],
+    ],
+    endpoints: [],
+    notes: 'One shared Jinja2Templates instance. Each router used to build its own, so a global registered in one was invisible in the others — which is why google_login_enabled only worked on pages rendered from routers/auth.py. With one instance, a helper registered anywhere is available everywhere. relative_time renders "3d ago" rather than a timestamp, because an activity feed is read for order and recency and an exact date makes the reader do the subtraction themselves.'
+  },
+
+  t_identity: {
+    name: 'Identity tables',
+    file: 'users · api_keys',
+    color: '#4CB782',
+    db: 'users (10 columns) · api_keys (7 columns)',
+    writes: [],
+    reads: [
+      ['users', 'username, email, google_sub all UNIQUE · token_version · avatar_color'],
+      ['api_keys', 'key_hash UNIQUE — the authentication lookup is one indexed read'],
+    ],
+    endpoints: [],
+    notes: 'At least one of hashed_password and google_sub is always set; an account with neither would have no way to sign in, which is why disconnecting Google from a password-less account is refused. token_version is the database-side half of session revocation and the only part that survives Redis being unavailable. The plaintext of an API key exists only in the one response that created it — the row holds its SHA-256 and a display prefix, so a database leak does not hand out working keys.'
+  },
+  t_tenancy: {
+    name: 'Tenancy tables',
+    file: 'workspaces · workspace_members · invites',
+    color: '#26B5CE',
+    db: 'workspaces · workspace_members (uq: workspace+user) · invites (token UNIQUE)',
+    writes: [],
+    reads: [
+      ['workspace_members', 'The table every access check actually runs on'],
+      ['workspaces', 'allow_password_login · allow_google_login · allowed_email_domain'],
+      ['invites', 'pending → accepted / revoked, 14-day expiry'],
+    ],
+    endpoints: [],
+    notes: 'There is no ACL table and no visible_to column: access control is a join. Every read resolves through workspace_members and team_members, so the worst outcome of a forged cookie or a guessed id is an empty result. A workspace must keep at least one owner and at least one team; both invariants are enforced at the routes that would break them. Invite tokens are unique so a link can be resolved by itself, without the recipient having to say who they are.'
+  },
+  t_structure: {
+    name: 'Structure tables',
+    file: 'teams · team_members',
+    color: '#F2C94C',
+    db: 'teams (uq: workspace+key) · team_members (uq: team+user)',
+    writes: [],
+    reads: [
+      ['teams.key', 'The visible half of every issue identifier — TODO-3'],
+      ['teams.issue_counter', 'Never rolled back on delete'],
+      ['teams.cycle_anchor / cycle_length_days', 'The rule the whole cycle series is generated from'],
+    ],
+    endpoints: [],
+    notes: 'Team keys are unique per workspace rather than globally, so two workspaces can each have their own TODO team. Renaming a key changes every identifier in the team — TODO-3 becomes ENG-3 — which breaks old links but no rows. team_members has no role column: privileges live at the workspace level, and a team is about visibility. Deleting a team with issues is refused rather than cascading, because todos.team_id has no cascade and leaving them would produce rows pointing at a team that is not there: invisible to every view and impossible to reach.'
+  },
+  t_planning: {
+    name: 'Planning tables',
+    file: 'projects · cycles',
+    color: '#BB87FC',
+    db: 'projects (team-scoped) · cycles (uq: team+number)',
+    writes: [],
+    reads: [
+      ['projects', 'name · status · lead_id · target_date'],
+      ['cycles', 'number · starts_on · ends_on, both inclusive'],
+    ],
+    endpoints: [],
+    notes: 'Both are containers an issue may point at, and both links are nullable — an issue with neither is what the backlog is. Project status is its own enumeration rather than a reuse of the issue statuses, because a project is a container and "backlog" means nothing for one. cycles has no is_current column on purpose: which cycle is current is computed from the dates on every request, and a stored flag would be wrong the morning after.'
+  },
+  t_work: {
+    name: 'Work table',
+    file: 'todos — the issues',
+    color: '#5E6AD2',
+    db: 'todos — 17 columns, indexed on team_id, project_id, cycle_id',
+    writes: [],
+    reads: [
+      ['status + complete', 'Kept in step by set_status, never written separately'],
+      ['number + teams.key', 'Compose the identifier; no identifier column is stored'],
+      ['started_at / completed_at', 'The two timestamps the burn-up is built from'],
+    ],
+    endpoints: [],
+    notes: 'Still called todos because the table predates the rename. complete is redundant with status = "done" and deliberately kept, because the original routes and the Redis cache still read it — it is only ever written through set_status, so the two cannot drift apart. No identifier column: TODO-3 is composed at render time, and storing it would duplicate the team key into every row and go stale the moment a team is renamed. assignee_id carries no index; My Issues filters on it, but only after joining through team_members, so the candidate set is already small.'
+  }
+};
+
+const TOPICS = {
+  'issues:team:{team_id}': {
+    kind: 'Redis key · string (JSON)',
+    written: 'redis_cache.set_cached_issues() after a database read',
+    read: ['issues router — team list and team Home', 'projects / cycles routers via the same helper'],
+    dropped: ['Every issue write', 'Project delete (its issues are released)', 'Team and workspace delete'],
+    ttl: '60 seconds',
+    note: 'Keyed by team, not by user: an issue belongs to a team, and once a team has more than one member a per-user key would hand each of them a separate copy that the others\' writes never invalidate. The write paths invalidate explicitly, so the TTL is only a safety net in case an invalidation is ever missed. Cached rows come back as SimpleNamespace objects so templates can use issue.title exactly as they do with an ORM row.'
+  },
+  'denylist:{jti}': {
+    kind: 'Redis key · string',
+    written: 'GET /auth/logout',
+    read: ['deps.identity → _user_from_cookie, on every cookie-authenticated request'],
+    dropped: ['Expires on its own — the TTL is the token\'s remaining life'],
+    ttl: 'Remaining token lifetime',
+    note: 'Deleting the cookie on logout does not invalidate the JWT — it stays valid until it expires. This marks it. The lookup fails open: when Redis is unavailable is_denylisted returns False, meaning a logged-out token stays usable until it expires on its own. Failing closed would sign every user out whenever Redis blinks. users.token_version covers what this cannot.'
+  },
+  'POST /team/{key}/new': {
+    kind: 'Write path · create issue',
+    written: 'todos (insert) + teams.issue_counter (bump)',
+    read: ['—'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '303 → /issue/{KEY}-{n}',
+    note: 'The number comes from teams.issue_counter rather than from a row count, so deleting an issue never causes the next one to reuse its identifier. The creator becomes both owner and assignee.'
+  },
+  'POST /issue/{id}/edit': {
+    kind: 'Write path · title, description, priority',
+    written: 'todos.title, description, priority, updated_at',
+    read: ['—'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '302 → /issue/{IDENTIFIER}',
+    note: 'The cached row carries title, description and priority, so an edit that skipped the invalidation would leave the list showing the old text for up to 60 seconds.'
+  },
+  'POST /issue/{id}/status': {
+    kind: 'Write path · board transition',
+    written: 'todos.status + complete + completed_at + started_at + updated_at',
+    read: ['Referer — to decide where to send the user back to'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '302 → the list or the issue',
+    note: 'The only route that moves an issue between statuses, and it delegates to models.set_status so the four derived columns are written together. started_at is set the first time the issue reaches in_progress or done and never rewritten afterwards.'
+  },
+  'POST /issue/{id}/priority': {
+    kind: 'Write path · priority',
+    written: 'todos.priority (clamped to 1–5), updated_at',
+    read: ['—'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '302 → /issue/{IDENTIFIER}',
+    note: 'Clamped rather than validated-and-refused: the value comes from a fixed menu, so anything outside the range is a stale form rather than a user decision.'
+  },
+  'POST /issue/{id}/project': {
+    kind: 'Write path · attach to a feature',
+    written: 'todos.project_id, updated_at',
+    read: ['projects in the issue\'s own team'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '303 → /issue/{IDENTIFIER}',
+    note: 'An empty project_id is the picker\'s first entry, so attaching and detaching go through one route. A project from another team is refused, not ignored — it would put an issue under a feature its own team cannot see.'
+  },
+  'POST /issue/{id}/cycle': {
+    kind: 'Write path · schedule into a time box',
+    written: 'todos.cycle_id, updated_at',
+    read: ['Non-completed cycles in the issue\'s own team'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '303 → /issue/{IDENTIFIER}',
+    note: 'Same shape as the project picker. Completed cycles are not offered: scheduling work into one that has already ended would make its burn-up disagree with what actually happened.'
+  },
+  'POST /issue/{id}/delete': {
+    kind: 'Write path · delete',
+    written: 'todos (delete)',
+    read: ['—'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '302 → /team/{key}/issues',
+    note: 'POST, not GET: the old /todos/delete/{id} link was one crawler away from clearing someone\'s list. teams.issue_counter is deliberately not rolled back — reusing the number would make TODO-3 mean two different things over time.'
+  },
+  'POST /project/{id}/delete': {
+    kind: 'Write path · delete the container, keep the contents',
+    written: 'projects (delete) + todos.project_id → NULL',
+    read: ['—'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '303 → /team/{key}/projects',
+    note: 'The issues are released rather than deleted, and that bulk UPDATE is exactly why the cache has to be dropped: those rows changed without any single issue route being called.'
+  },
+  'POST /settings/teams/{key}/delete': {
+    kind: 'Write path · delete a team',
+    written: 'teams + team_members + todos for that team (delete)',
+    read: ['Issue count — the delete is refused while any remain'],
+    dropped: ['issues:team:{team_id}'],
+    ttl: '303 → /settings/teams',
+    note: 'SQLite hands the next team the rowid this one just freed, and the cache is keyed on that id — so without the invalidation a brand new team would inherit the deleted one\'s issue list until the entry expired. provisioning.delete_team returns the ids rather than clearing them, so the obligation is hard to miss.'
+  },
+  'POST /settings/workspace/delete': {
+    kind: 'Write path · delete a workspace',
+    written: 'workspaces (cascades members, teams, invites) + todos per team',
+    read: ['confirm_name must match exactly · owner only'],
+    dropped: ['issues:team:{id} for every team in the workspace'],
+    ttl: '303 → /',
+    note: 'Members, teams and invites cascade from the model; issues do not, so they are taken down per team first. Refused when it is the caller\'s only workspace — it would leave the account with nowhere to work.'
+  },
+  'GET /auth/logout': {
+    kind: 'Session invalidation · this token',
+    written: 'denylist:{jti} in Redis, TTL = remaining token life',
+    read: ['The access_token cookie, decoded for jti and exp'],
+    dropped: ['The access_token cookie itself'],
+    ttl: 'Until the token would have expired anyway',
+    note: 'Reaches exactly one token: the one in this browser. Skipped silently when Redis is down, in which case the token stays valid until it expires — which is what the other pill is for.'
+  },
+  'POST /settings/security/sessions': {
+    kind: 'Session invalidation · every token, everywhere',
+    written: 'users.token_version + 1, then a fresh cookie for this tab',
+    read: ['—'],
+    dropped: ['Every outstanding access token for this user'],
+    ttl: 'Immediate and permanent',
+    note: 'The database-backed half of revocation. Every token carries the token_version it was minted with, so bumping the column invalidates all of them at once — including sessions on other machines, which the Redis deny-list cannot reach because it only ever learns about the one token being logged out. Re-minting afterwards is why this is "other sessions" and not a self-inflicted logout. It also works with Redis entirely down.'
+  }
+};
+
+let activeId = null;
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function methodClass(m) {
+  if (m === 'GET') return 'get';
+  if (m === 'POST') return 'post';
+  return 'redirect';
+}
+
+function openPanel(name, file, color) {
+  document.getElementById('panelDot').style.background = color;
+  document.getElementById('panelName').textContent = name;
+  document.getElementById('panelFile').textContent = file || '';
+}
+
+function showDetail(id, el) {
+  const d = DATA[id];
+  if (!d) return;
+
+  if (activeId === id) { closeDetail(); return; }
+  activeId = id;
+
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  openPanel(d.name, d.file, d.color);
+
+  let html = '';
+
+  if (d.db) html += `<div class="db-badge">🗄️ ${esc(d.db)}</div>`;
+
+  const hasW = d.writes.length > 0;
+  const hasR = d.reads.length > 0;
+  const hasE = d.endpoints.length > 0;
+
+  if (hasW || hasR) {
+    html += `<div class="panel-grid" style="margin-bottom:16px;">`;
+    if (hasW) {
+      html += `<div><div class="panel-section-title">▲ Writes / invalidates</div><div class="event-list">`;
+      d.writes.forEach(([n, desc]) => {
+        html += `<div class="event-item"><span class="event-arrow pub">↑</span><span class="event-name">${esc(n)}</span><span class="event-desc">${esc(desc)}</span></div>`;
+      });
+      html += `</div></div>`;
+    } else {
+      html += `<div></div>`;
+    }
+    if (hasR) {
+      html += `<div><div class="panel-section-title">▼ Reads</div><div class="event-list">`;
+      d.reads.forEach(([n, desc]) => {
+        html += `<div class="event-item"><span class="event-arrow sub">↓</span><span class="event-name">${esc(n)}</span><span class="event-desc">${esc(desc)}</span></div>`;
+      });
+      html += `</div></div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (hasE) {
+    html += `<div style="margin-bottom:16px;"><div class="panel-section-title">Routes</div><div class="endpoint-list">`;
+    d.endpoints.forEach(([method, path]) => {
+      html += `<div class="endpoint"><span class="method ${methodClass(method)}">${esc(method)}</span><span>${esc(path)}</span></div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (d.notes) {
+    html += `<div class="why">
+      <div class="panel-section-title" style="margin-bottom:6px;">Why it is like this</div>
+      <div class="why-body">${d.notes}</div>
+    </div>`;
+  }
+
+  render(html);
+}
+
+function showTopic(key) {
+  const t = TOPICS[key];
+  if (!t) return;
+
+  clearActive();
+  openPanel(key, t.kind, '#8E97E8');
+
+  let html = `<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px;">
+      <div>
+        <div class="panel-section-title">Written by</div>
+        <div style="font-family:var(--mono); font-size:10px; color:#6ED4A6; background:rgba(76,183,130,0.08); padding:6px 10px; border-radius:5px; line-height:1.5;">${esc(t.written)}</div>
+      </div>
+      <div>
+        <div class="panel-section-title">Read by</div>
+        <div class="event-list">`;
+  t.read.forEach(c => {
+    html += `<div style="font-family:var(--mono); font-size:10px; color:var(--text); background:rgba(38,181,206,0.08); padding:4px 8px; border-radius:4px; margin-bottom:4px; line-height:1.5;">${esc(c)}</div>`;
+  });
+  html += `</div></div>
+      <div>
+        <div class="panel-section-title">Invalidates / result</div>
+        <div class="event-list">`;
+  t.dropped.forEach(c => {
+    html += `<div style="font-family:var(--mono); font-size:10px; color:#F3AE6B; background:rgba(242,153,74,0.08); padding:4px 8px; border-radius:4px; margin-bottom:4px; line-height:1.5;">${esc(c)}</div>`;
+  });
+  html += `</div>
+        <div class="panel-section-title" style="margin-top:10px;">Lifetime</div>
+        <div style="font-family:var(--mono); font-size:10px; color:var(--muted); line-height:1.5;">${esc(t.ttl)}</div>
+      </div>
+    </div>`;
+
+  html += `<div class="why">
+      <div class="panel-section-title" style="margin-bottom:6px;">Why it is like this</div>
+      <div class="why-body">${esc(t.note)}</div>
+    </div>`;
+
+  render(html);
+}
+
+function render(html) {
+  const panel = document.getElementById('detailPanel');
+  document.getElementById('panelContent').innerHTML = html;
+  panel.classList.add('visible');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearActive() {
+  activeId = null;
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+}
+
+function closeDetail() {
+  clearActive();
+  document.getElementById('detailPanel').classList.remove('visible');
+}
+
+// The cards carry flow content, so they are divs rather than buttons. That
+// means Enter and Space have to be wired up by hand, or they would be
+// reachable by Tab and then do nothing.
+document.querySelectorAll('.card[role="button"]').forEach(card => {
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
+  });
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+</script>
+</body>
+</html>

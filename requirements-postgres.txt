@@ -1,0 +1,2 @@
+# PostgreSQL driver used by SQLAlchemy with a postgresql+psycopg URL.
+psycopg[binary]>=3.2,<4
